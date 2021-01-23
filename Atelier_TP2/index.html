@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="d3.min.js"></script>
+</head>
+<body>
+    <svg width="1800" height="800"></svg>
+</body>
+<script>
+    var svg = d3.select("svg");
+    var dataset = [];
+    for (let i = 0; i < 40; i++) {
+        let e = [Math.floor(Math.random() * Math.floor(1000))]
+        e.push(Math.floor(Math.random() * Math.floor(1000), Math.floor(Math.random() * Math.floor(1000))))
+        dataset.push(e)
+    }
+    //var dataset = [[20, 5], [110, 30], [214, 66], [145, 65], [267, 133], [280, 200], [270, 67], [163, 132], [65, 230], [256, 65]];
+
+    var circle = svg.selectAll("circle")
+        .data(dataset)
+
+    var h = 800;
+    var w = 1800;
+    var xScale = d3.scaleLinear().domain([0, d3.max(dataset, (d) => d[0])]).range([0, w - 100]); 
+    var yScale = d3.scaleLinear().domain([0, d3.max(dataset, (d) => d[1])]).range([0, h - 100]); 
+    var rScale = d3.scaleLinear().domain([0, d3.max(dataset, (d) => d[0])]).range([1, 20]); 
+
+    circle.enter().append("circle")
+        .attr("cy", (d) => yScale(d[1]))
+        .attr("cx", (d) => xScale(d[0]))
+        .attr("r", (d) => rScale(d[0]))
+        .attr("style", "fill:steelblue;")
+
+    svg.selectAll("text").data(dataset).enter().append("text").text(function(d) {return d[0] + "," + d[1]; }).attr("x", function(d) {return xScale(d[0]);}).attr("y", function(d) { return yScale(d[1]);}).attr("font-family", "sans-serif").attr("font-size", "11px").attr("fill", "black");
+</script>
+</html>
