@@ -19,6 +19,7 @@ plt.imshow(hog_image, cmap=plt.cm.gray)
 def gradiant(img, x, y):
     gx = img[y, x+1]-img[y, x-1]
     gy = img[y+1, x]-img[y-1, x]
+    console.print(np.arctan(gy/gx))
     if gx == 0: return np.pi/2
     return np.arctan(gy/gx)
 
@@ -50,10 +51,10 @@ def mouse_click(event, x, y, flags, param):
                 ":warning: Selected Area isn't 12x12 area, Please select a correct zone :warning:", style="red on white")
         else:
             hog = []
-            for x in range(1, 10):
-                for y in range(1, 10):
-                    hog.append((gradiant(crop_img, x, y) * (180/np.pi)))
-            print(hog)
+            for x in range(4):
+                for y in range(4):
+                    hog.append((gradiant(crop_img, (x * 3) + 1, (y * 3) + 1) * (180/np.pi)))
+            console.print("Hog angles : ", hog)
             fig = plt.figure("Selected_Output")
             ax = fig.add_subplot(1, 2, 1)
             plt.imshow(crop_img, cmap='gray')
