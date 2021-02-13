@@ -125,7 +125,8 @@ function grayscale(img_data){
 
 var rect_pos = null;
 var selecting = false;
-var rect_size = [10, 10];
+var rect_size = [30, 30];
+var classes = 180/8;
 
 function draw_rect(e){
     ctx_color.putImageData(origin_color_data, 0, 0);
@@ -139,6 +140,7 @@ function draw_rect(e){
 function hog(x, y){
     var gx = origin_grayscale_data[y][x+1]-origin_grayscale_data[y][x-1];
     var gy = origin_grayscale_data[y+1][x]-origin_grayscale_data[y-1][x];
+    if(gx == 0) return 90;
     //var gp = Math.sqrt(Math.pow(gx, 2)+Math.pow(gy, 2));
     var theta = Math.atan(gy/gx)*(180/Math.PI);
     return theta;
@@ -146,7 +148,6 @@ function hog(x, y){
 
 function calculate_hog_histogram(canvas_data){
     var hist = [];
-    var classes = 8;
     for(var y = rect_pos[1]; y < rect_pos[1]+rect_size[1]; y++){
         for(var x = rect_pos[0]; x < rect_pos[0]+rect_size[0]; x++){
             var h = hog(x, y)+90;

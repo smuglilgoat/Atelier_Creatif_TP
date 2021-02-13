@@ -19,6 +19,7 @@ plt.imshow(hog_image, cmap=plt.cm.gray)
 def gradiant(img, x, y):
     gx = img[y, x+1]-img[y, x-1]
     gy = img[y+1, x]-img[y-1, x]
+    if gx == 0: return np.pi/2
     return np.arctan(gy/gx)
 
 # def calc_mse(a, b):
@@ -51,14 +52,14 @@ def mouse_click(event, x, y, flags, param):
             hog = []
             for x in range(1, 10):
                 for y in range(1, 10):
-                    hog.append(gradiant(crop_img, x, y) * (180/np.pi))
+                    hog.append((gradiant(crop_img, x, y) * (180/np.pi)))
             print(hog)
             fig = plt.figure("Selected_Output")
             ax = fig.add_subplot(1, 2, 1)
             plt.imshow(crop_img, cmap='gray')
             ax.set_title('Cropped Image')
             ax = fig.add_subplot(1, 2, 2)
-            bins = [22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5, 360]
+            bins = [-22.5, 22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5]
             plt.hist(hog, bins=bins,rwidth=0.5)
             xticks = [(bins[idx+1] + value)/2 for idx, value in enumerate(bins[:-1])]
             plt.xticks(xticks, labels = [1, 2, 3, 4, 5, 6, 7, 8])
