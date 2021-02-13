@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <style type="text/css">
+        body{
+            font-family: sans-serif;
+            font-size: 22px;
+        }
+        canvas{
+            border: 1px solid black;
+        }
+        #histogram, #histogram_found{
+            display: inline-block;
+            height: 300px;
+            width: 600px;
+            border: 1px solid black;
+        }
+        .bar{
+            display: inline-block;
+            background-color: red;
+        }
+    </style>
+</head>
+<body>
+<label for="file_input">Select an image: </label><input type="file" id="file_input">
+<div id="show_later" style="display: none;">
+    <br>
+    <canvas id="canvas_color"></canvas>
+    <div id="histogram"></div><br>
+</div>
+<script type="text/javascript">
+var canvas_color = document.getElementById("canvas_color");
+var ctx_color = canvas_color.getContext("2d");
+
+var image_is_ready = false;
+
+ctx_color.imageSmoothingEnabled = false;
+
+document.getElementById("file_input").onchange = function(e){
+    var file = e.target.files[0];
+    var reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = function(e){
+        upload_image(e.target.result, file.name);
+    }
+}
+
+var origin_color_data = null;
+var origin_grayscale_data = null;
+
+function upload_image(src, name){
+    var img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = src;
+    img.onload = function(){
+        var tmp_canvas = document.createElement("canvas");
+        var tmp_ctx = tmp_canvas.getContext("2d");
+        tmp_canvas.width = img.width;
+        tmp_canvas.height = img.height;
+        tmp_ctx.drawImage(img, 0, 0, img.width, img.height);
+        var img_data = tmp_ctx.getImageData(0, 0, tmp_canvas.width, tmp_canvas.height);
+        draw_data_to_canvas(img_data, img.width, img.height);
+        origin_color_data = img_data;
+        origin_grayscale_data = grayscale(img_data);
+        image_is_ready = true;
+        document.getElementById("show_later").style.display = "inherit";
+    }
+}
+
+function draw_data_to_canvas(img_data, width, height){
+    canvas_color.width = width;
+    canvas_color.height = height;
+    var canvas_data = ctx_color.getImageData(0, 0, canvas_color.width, canvas_color.height);
+
+    for(var y = 0; y < height; y++){
+        for(var x = 0; x < width; x++){
+            var index = x+y*width;
+            index *= 4;
+            var index_canvas = x+y*canvas_data.width;
+            index_canvas *= 4;
+            canvas_data.data[index_canvas+0] = img_data.data[index+0];
+            canvas_data.data[index_canvas+1] = img_data.data[index+1];
+            canvas_data.data[index_canvas+2] = img_data.data[index+2];
+            canvas_data.data[index_canvas+3] = 255;
+        }
+    }
+
+    ctx_color.putImageData(canvas_data, 0, 0);
+}
+
+function grayscale(img_data){
+    var grayscale_img = [];
+    for(var y = 0; y < img_data.height; y++){
+        grayscale_img.push([]);
+        grayscale_img[y].push(0);
+        for(var x = 0; x < img_data.width; x++){
+            var index = x+y*img_data.width;
+            index *= 4;
+            var index_canvas = x+y*img_data.width;
+            index_canvas *= 4;
+            var grayscale = 0.2989*img_data.data[index+0]
+                            +0.5870*img_data.data[index+1]
+                            +0.1140*img_data.data[index+2];
+            grayscale = Math.round(grayscale);
+            grayscale_img[y].push(grayscale);
+        }
+        grayscale_img[y].push(0);
+    }
+
+    var start = []
+    for(var x = 0; x < img_data.width+2; x++){
+        start.push(0);
+    }
+    grayscale_img.unshift(start);
+
+    var end = []
+    for(var x = 0; x < img_data.width+2; x++){
+        end.push(0);
+    }
+    grayscale_img.push(end);
+    return grayscale_img;
+}
+
+var rect_pos = null;
+var selecting = false;
+var rect_size = [10, 10];
+
+function draw_rect(e){
+    ctx_color.putImageData(origin_color_data, 0, 0);
+    ctx_color.beginPath();
+    ctx_color.strokeStyle = "red";
+    ctx_color.lineWidth = "3";
+    ctx_color.rect(rect_pos[0], rect_pos[1], rect_size[0], rect_size[1]);
+    ctx_color.stroke();
+}
+
+function hog(x, y){
+    var gx = origin_grayscale_data[y][x+1]-origin_grayscale_data[y][x-1];
+    var gy = origin_grayscale_data[y+1][x]-origin_grayscale_data[y-1][x];
+    //var gp = Math.sqrt(Math.pow(gx, 2)+Math.pow(gy, 2));
+    var theta = Math.atan(gy/gx)*(180/Math.PI);
+    return theta;
+}
+
+function calculate_hog_histogram(canvas_data){
+    var hist = [];
+    var classes = 8;
+    for(var y = rect_pos[1]; y < rect_pos[1]+rect_size[1]; y++){
+        for(var x = rect_pos[0]; x < rect_pos[0]+rect_size[0]; x++){
+            var h = hog(x, y)+90;
+
+            var c = Math.floor(h/classes);
+            if(!hist[c]){
+                hist[c] = 1;
+            }
+            else{
+                hist[c]++;
+            }
+        }
+    }
+    return hist;
+}
+
+document.getElementById("canvas_color").addEventListener("mousemove", function(e){
+    if(!image_is_ready) return;
+    var target = e.target;
+    rect_pos = [Math.floor(e.clientX-target.getBoundingClientRect().left-rect_size[0]/2),
+                Math.floor(e.clientY-target.getBoundingClientRect().top-rect_size[1]/2)];
+    draw_rect(e);
+    var hist = calculate_hog_histogram(origin_color_data);
+    draw_histogram(hist, "histogram");
+});
+
+function draw_histogram(hist, id){
+    var max = Number.NEGATIVE_INFINITY;
+    for(var i = 0; i < hist.length; i++){
+         if(hist[i] > max) max = hist[i];
+    }
+
+    var hist_div = document.getElementById(id);
+    hist_div.innerHTML = "";
+    for(var i = 0; i < hist.length; i++){
+        var bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.height = (hist[i]*100/max)+"%";
+        bar.style.width = "calc(100% / "+hist.length+")";
+        hist_div.appendChild(bar);
+    }
+}
+</script>
+</body>
+</html>
