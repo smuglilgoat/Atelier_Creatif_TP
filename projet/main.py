@@ -1,9 +1,24 @@
-import cv2 as cv
+
 import numpy as np
-from matplotlib import pyplot as plt
-from PIL import Image
+import cv2
 from rich.console import Console
 console = Console()
+
+
+def calculateHist(image):
+    hist = np.zeros(256)
+    tmp = np.unique(image, return_counts=True)
+    for i in range(0, len(tmp[0])):
+        hist[int(tmp[0][i])] = tmp[1][i]
+    return hist
+
+
+def calculateHOG(array):
+    hog = np.zeros(9)
+    for i in array:
+        index = int((i+90)/22.5)
+        hog[index] += 1
+    return hog
 
 def getPixel(img, center, x, y):
     value = 0
@@ -14,52 +29,123 @@ def getPixel(img, center, x, y):
         pass
     return value
 
-def calculLBP(img, x, y):
-    center = img[x][y]
-    valueArray = []
-    valueArray.append(getPixel(img, center, x-1, y+1))     # top_right
-    valueArray.append(getPixel(img, center, x, y+1))       # right
-    valueArray.append(getPixel(img, center, x+1, y+1))     # bottom_right
-    valueArray.append(getPixel(img, center, x+1, y))       # bottom
-    valueArray.append(getPixel(img, center, x+1, y-1))     # bottom_left
-    valueArray.append(getPixel(img, center, x, y-1))       # left
-    valueArray.append(getPixel(img, center, x-1, y-1))     # top_left
-    valueArray.append(getPixel(img, center, x-1, y))       # top
+def calculateLBP(img):
+    img = np.pad(img, 1, mode="edge")
+    lbp = np.zeros(img.shape)
+    for i in range(1, lbp.shape[0]-1):
+        for j in range(1,  lbp.shape[1]-1):
+            center = img[i][j]
+            valueArray = []
+            valueArray.append(getPixel(img, center, i-1, j+1))     # top_right
+            valueArray.append(getPixel(img, center, i, j+1))       # right
+            valueArray.append(getPixel(img, center, i+1, j+1))     # bottom_right
+            valueArray.append(getPixel(img, center, i+1, j))       # bottom
+            valueArray.append(getPixel(img, center, i+1, j-1))     # bottom_left
+            valueArray.append(getPixel(img, center, i, j-1))       # left
+            valueArray.append(getPixel(img, center, i-1, j-1))     # top_left
+            valueArray.append(getPixel(img, center, i-1, j))       # top
+            lbp[i][j] = np.sum(np.multiply(
+                valueArray, [1, 2, 4, 8, 16, 32, 64, 128]))
+    return lbp[1:lbp.shape[0]-1:1, 1:lbp.shape[1]-1]
 
-    factorArray = [1, 2, 4, 8, 16, 32, 64, 128]
-    val = 0
-    for i in range(len(valueArray)):
-        val += valueArray[i] * factorArray[i]
-    return val
+
+def calculateGradiant(img, x, y):
+    gx = img[y+1][x]-img[y-1][x]
+    gy = img[x+1][y]-img[x-1][y]
+    mag = np.sqrt(gx**2+gy**2)
+    dir = np.sign(gy) * 90 if gx == 0 else np.degrees(np.arctan(gy/gx))
+    return mag, dir
+
+
+def calculateDir(image):
+    dir = []
+    image = np.pad(image, 1, mode="edge")
+    for j in range(1, image.shape[0]-1):
+        for i in range(1,  image.shape[1]-1):
+            dir.append(calculateGradiant(image, j, i)[1])
+    return dir
+
+
+def imgHIST(image, size):
+    hist = []
+    image = np.pad(image, 1, mode="edge")
+    for j in range(1, image.shape[0]-1, size):
+        for i in range(1, image.shape[1]-1, size):
+            region = image[j:j+size, i:i+size]
+            lbp = calculateLBP(region)
+            hist.append(calculateHist(lbp))
+    return np.array(hist)
+
+
+def imgHOG(image, size):
+    hog = []
+    image = np.pad(image, 1, mode="edge")
+    for j in range(1, image.shape[0]-1, size):
+        for i in range(1, image.shape[1]-1, size):
+            region = image[j:j+size, i:i+size]
+            regionHOG = calculateDir(region)
+            hog.append(calculateHOG(regionHOG))
+    return np.array(hog)
+
+
+def calculateMSE(arrA, arrB):
+    arrA = arrA.flatten()
+    arrB = arrB.flatten()
+    return np.sqrt(((arrA - arrB)**2).mean())
+
+def buildAI(ai):
+    lbp = []
+    hog = []
+    for i in range(1, 25+1):
+        try:
+            data = cv2.imread('dataset\\'+str(i)+'.jpg')
+            data = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
+            faces = ai.detectMultiScale(data, 1.1, 4)
+            for (x, y, w, h) in faces:
+                data = cv2.resize(data[y:y+h, x:x+w], (64, 128))
+                dataLBP = np.copy(data)
+                lbp.append(imgHIST(dataLBP, 8))
+                hog.append(imgHOG(data, 8))
+        except:
+            console.print(i)
+    return lbp, hog 
 
 def main():
-    img = cv.imread('car.jpg')
-    img = cv.resize(img, (128, 128))
-    height, width, channel = img.shape
-    console.print('Image=', img)
-    console.print('Height=', height, ', Width=', width, ', Channel=', channel)
+    faceDetecteAI = cv2.CascadeClassifier('face_detection_ai.xml')
+    refLBP, refHOG = buildAI(faceDetecteAI)
 
-    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    result_lbp = []
+    webcam = cv2.VideoCapture(0)
 
-    for i in range(16):
-        for y in range(16):
-            img_cropped = gray[8 * i: 8 * i + 8, 8 * y: 8 * y + 8]
-            for i in range(8):
-                for j in range(8):
-                    result_lbp.append(calculLBP(img_cropped, i, j))
-            
-    result_lbp = np.array(result_lbp)
-    console.print('LBP=', result_lbp)
+    while True:
+        _, frame = webcam.read()
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = faceDetecteAI.detectMultiScale(gray, 1.1, 4)
 
-    fig = plt.figure("Image LBP")
-    ax = fig.add_subplot(1, 2, 1)
-    plt.imshow(gray, cmap='gray')
-    ax.set_title('Image')
-    ax = fig.add_subplot(1, 2, 2)
-    plt.hist(result_lbp, bins=256)
-    ax.set_title('LBP Histogramme')
-    plt.show()
+        for (x, y, w, h) in faces:
+            face = cv2.resize(gray[y:y+h, x:x+w], (64, 128))
+            imgLBP = imgHIST(face, 8)
+            imgHog = imgHOG(face, 8)
+
+            error = 0
+            for i in range(0, len(refLBP)):
+                error += (calculateMSE(imgLBP, refLBP[i]))
+                error += (calculateMSE(imgHog, refHOG[i]))
+            border = (0, 0, 255)
+            if error < 150:
+                border = (0, 255, 0)
+            console.print("Erreur MSE:", error)
+            cv2.rectangle(frame, (x, y), (x+w, y+h), border, 2)
+        try:
+            cv2.imshow('Projet Atelier - Detection Faciale', frame)
+        except:
+            pass
+        if cv2.waitKey(1) & 0xFF == ord('x'):
+            break
+    webcam.release()
+    cv2.destroyAllWindows()
+    pass
+
 
 if __name__ == "__main__":
     main()
+    pass
