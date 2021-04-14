@@ -45,58 +45,29 @@ def getHOG(img):
     return np.array(hogHist)
 
 
-def calculateMSE(arrA, arrB):
-    arrA = np.array(arrA)
-    arrB = np.array(arrB)
-    differenceArray = np.subtract(arrA, arrB)
-    squaredArray = np.square(differenceArray)
-    mse = squaredArray.mean()
-    return mse
-
-
 def main():
     faceClassifier = cv.CascadeClassifier('classifier\\haarcascade_frontalface_default.xml')
+    refLBP = []
+    refHOG = []
 
-    with open('refLBP', 'rb') as fp:
-        refLBP = pickle.load(fp)
+    for i in range(1, 13+1):
+        image = cv.imread('dataset\\'+str(i)+'.jpg')
+        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        faces = faceClassifier.detectMultiScale(image, scaleFactor=1.05, minNeighbors=4)
+        for (x, y, w, h) in faces:
+            face = image[y:y+h, x:x+w]
+            faceResized = cv.resize(face, (64, 128))
+            refLBP.append(getLBP(faceResized))
+            refHOG.append(getHOG(faceResized))
 
-    with open('refHOG', 'rb') as fp:
-        refHOG = pickle.load(fp)
+    with open('refLBP', 'wb') as fp:
+        pickle.dump(refLBP, fp)
+
+    with open('refHOG', 'wb') as fp:
+        pickle.dump(refHOG, fp)
 
     console.print('LBP=', refLBP)
     console.print('HOG=', refHOG)
-
-    webcam = cv.VideoCapture(0)
-
-    while True:
-        _, frame = webcam.read()
-        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-        faces = faceClassifier.detectMultiScale(
-            gray, scaleFactor=1.05, minNeighbors=4)
-
-        for (x, y, w, h) in faces:
-            face = gray[y:y+h, x:x+w]
-            faceResized = cv.resize(face, (64, 128))
-            faceLBP = getLBP(faceResized)
-            faceHOG = getHOG(faceResized)
-
-            error = calculateMSE(faceLBP, refLBP) + calculateMSE(faceHOG, refHOG)
-
-            cv.putText(frame, str(int(error)), (x, y), cv.FONT_HERSHEY_SIMPLEX,
-                       1, (255, 0, 0) if error < 3000 else (0, 0, 255), 2)
-            cv.circle(frame, (x+w//2, y+h//2), 150, (255, 0, 0)
-                      if error < 3000 else (0, 0, 255), 2)
-        try:
-            cv.imshow('Projet Atelier - Detection Faciale', frame)
-        except:
-            pass
-
-        key = cv.waitKey(1)
-        if key == 27:
-            break
-
-    webcam.release()
-    cv.destroyAllWindows()
     pass
 
 

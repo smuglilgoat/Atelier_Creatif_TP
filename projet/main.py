@@ -56,7 +56,6 @@ def calculateGradiant(img, x, y):
     dir = np.sign(gy) * 90 if gx == 0 else np.degrees(np.arctan(gy/gx))
     return mag, dir
 
-
 def calculateDir(image):
     dir = []
     image = np.pad(image, 1, mode="edge")
@@ -96,7 +95,7 @@ def calculateMSE(arrA, arrB):
 def buildAI(ai):
     lbp = []
     hog = []
-    for i in range(1, 25+1):
+    for i in range(1, 13+1):
         try:
             data = cv2.imread('dataset\\'+str(i)+'.jpg')
             data = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
@@ -111,7 +110,7 @@ def buildAI(ai):
     return lbp, hog 
 
 def main():
-    faceDetecteAI = cv2.CascadeClassifier('face_detection_ai.xml')
+    faceDetecteAI = cv2.CascadeClassifier('classifier\\face_detection_ai.xml')
     refLBP, refHOG = buildAI(faceDetecteAI)
 
     webcam = cv2.VideoCapture(0)
@@ -131,15 +130,15 @@ def main():
                 error += (calculateMSE(imgLBP, refLBP[i]))
                 error += (calculateMSE(imgHog, refHOG[i]))
             border = (0, 0, 255)
-            if error < 150:
-                border = (0, 255, 0)
+            if error < 80:
+                border = (255, 0, 0)
             console.print("Erreur MSE:", error)
-            cv2.rectangle(frame, (x, y), (x+w, y+h), border, 2)
+            cv2.circle(frame, (x+w//2, y+h//2), 150, border, 2)
         try:
             cv2.imshow('Projet Atelier - Detection Faciale', frame)
         except:
             pass
-        if cv2.waitKey(1) & 0xFF == ord('x'):
+        if cv2.waitKey(1) == 13:
             break
     webcam.release()
     cv2.destroyAllWindows()
